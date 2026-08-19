@@ -98,32 +98,120 @@ def find_product_cards(s: BeautifulSoup):
 
 def parse_detail(url: str, fallback_name: str, fallback_image: str, fallback_price):
     try:
-        s=soup(url)
+        s = soup(url)
     except Exception:
-        return {'sku':'','name':fallback_name,'image_url':fallback_image,'price':fallback_price,'extra':{}}
-    text=clean(s.get_text(' ', strip=True))
-    name=fallback_name
-    # Prefer page H1/title if available.
-    h1=s.find('h1')
-    if h1 and clean(h1.get_text(' ', strip=True)): name=clean(h1.get_text(' ', strip=True))
-    # Generic SKU extraction from labels such as Артикул / SKU.
-    sku=''
-    m=re.search(r'(?:Артикул|SKU)\s*[:№]?\s*([A-Za-zА-Яа-я0-9._/-]+)', text, re.I)
-    if m: sku=clean(m.group(1))
-    imgs=[]
-    for img in s.find_all('img', src=True):
-        u=absolute(img.get('src') or img.get('data-src') or '', url)
-        if u and u not in imgs and not any(x in u.lower() for x in ('logo','icon','menu')): imgs.append(u)
-    main_image=imgs[0] if imgs else fallback_image
-    # Capture simple property rows for optional future enrichment.
-    extra={}
-    for row in s.find_all(['tr','li','div']):
-        t=clean(row.get_text(' ', strip=True))
-        if ':' in t and len(t)<180:
-            k,v=[clean(x) for x in t.split(':',1)]
-            if 1<=len(k)<=50 and 1<=len(v)<=120:
-                extra.setdefault(k,v)
-    return {'sku':sku,'name':name,'image_url':main_image,'price':fallback_price,'extra':extra}
+        return {
+            'sku': '',
+            'name': fallback_name,
+            'image_url': fallback_image,
+            'price': fallback_price,
+            'extra': {}
+        }
+
+    text = clean(s.get_text(' ', strip=True))
+
+    # Название
+    name = fallback_name
+    h1 = s.find('h1')
+    if h1:
+        h1_text = clean(h1.get_text(' ', strip=True))
+        if h1_text:
+            name = h1_text
+
+    # YECHIM SKU/артикул НЕ берём из Eman.
+    # Он будет добавляться вручную через Dashboard.
+    sku = ''
+
+    # Цена:
+    # Берём все найденные суммы и выбираем наиболее вероятную
+    # отображаемую цену, игнорируя мелкие технические значения.
+    prices = []
+
+    for match in re.finditer(
+        r'([0-9][0-9\s\u00a0.,]*)\s*(?:so[‘’\'`]m|сум|сўм|UZS)',
+        text,
+        re.I
+    ):
+        value = to_number(match.group(1))
+        if value > 0:
+            prices.append(value)
+
+    price = max(prices) if prices else None
+
+    # Фото:
+    # Сначала пробуем Open Graph — обычно это главное фото товара.
+    image_candidates = []
+
+    og_image = s.find('meta', attrs={'property': 'og:image'})
+    if og_image and og_image.get('content'):
+        image_candidates.append(
+            absolute(og_image.get('content'), url)
+        )
+
+    # Затем обычные изображения.
+    for img in s.find_all('img'):
+        src = (
+            img.get('src')
+            or img.get('data-src')
+            or img.get('data-lazy-src')
+            or img.get('data-original')
+            or ''
+        )
+
+        if not src:
+            continue
+
+        image_candidates.append(absolute(src, url))
+
+    def valid_image(u: str) -> bool:
+        low = (u or '').lower()
+
+        if not u:
+            return False
+
+        blocked = (
+            'mc.yandex.ru',
+            'yandex.ru/watch',
+            'google-analytics',
+            'favicon',
+            'logo',
+            'icon',
+            'menu',
+            'sprite',
+            'placeholder'
+        )
+
+        return not any(x in low for x in blocked)
+
+    images = []
+
+    for u in image_candidates:
+        if valid_image(u) and u not in images:
+            images.append(u)
+
+    main_image = images[0] if images else fallback_image
+
+    # Характеристики Eman сохраняем в extra.
+    extra = {}
+
+    for row in s.find_all(['tr', 'li']):
+        t = clean(row.get_text(' ', strip=True))
+
+        if ':' not in t or len(t) >= 180:
+            continue
+
+        k, v = [clean(x) for x in t.split(':', 1)]
+
+        if 1 <= len(k) <= 80 and 1 <= len(v) <= 150:
+            extra.setdefault(k, v)
+
+    return {
+        'sku': sku,
+        'name': name,
+        'image_url': main_image,
+        'price': price,
+        'extra': extra
+    }
 
 
 def parse_list_page(url: str, brand: str, group: str):
