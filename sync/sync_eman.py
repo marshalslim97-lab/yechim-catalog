@@ -191,19 +191,9 @@ def parse_detail(url: str, fallback_name: str, fallback_image: str, fallback_pri
 
     main_image = images[0] if images else fallback_image
 
-    # Характеристики Eman сохраняем в extra.
-    extra = {}
-
-    for row in s.find_all(['tr', 'li']):
-        t = clean(row.get_text(' ', strip=True))
-
-        if ':' not in t or len(t) >= 180:
-            continue
-
-        k, v = [clean(x) for x in t.split(':', 1)]
-
-        if 1 <= len(k) <= 80 and 1 <= len(v) <= 150:
-            extra.setdefault(k, v)
+# Дополнительные характеристики YECHIM
+# заполняются вручную через Dashboard.
+extra = {}
 
     return {
         'sku': sku,
