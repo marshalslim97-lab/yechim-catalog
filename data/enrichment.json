@@ -1,0 +1,5 @@
+{
+  "demo-001":{"description":"Дополнительная информация YECHIM LIGHTING","specs":{"Напряжение":"12 V","Мощность":"9,6 W/м","IP":"IP20","Длина":"5 м","Цвет":"Холодный белый"},"additional_images":[],"mounting_scheme":"","pdf":"","badge":""},
+  "demo-002":{"description":"Комплектующая для углового профиля AQ FORM.","specs":{"Размер":"16×16 мм","Цвет":"Серый"},"additional_images":[],"mounting_scheme":"","pdf":"","badge":""},
+  "demo-003":{"description":"Сенсорный выключатель с диммером для мебельной подсветки.","specs":{"Напряжение":"12/24 V","Мощность":"60/120 W","Тип":"Сенсорный"},"additional_images":[],"mounting_scheme":"","pdf":"","badge":""}
+}

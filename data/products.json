@@ -1,0 +1,12 @@
+{
+  "generated_at": "2026-08-19T08:00:00+05:00",
+  "source": "https://www.eman.uz/",
+  "products": [
+    {"id":"demo-001","sku":"AQ-LED-2835-120-12V-9.6-IP20-CW","name":"Лента светодиодная AQ LED-LINE 2835 120 LED/м 12V 9,6W/м 8 мм IP20 холодный белый 5 м","brand":"YECHIM LIGHTING","eman_group":"Мебельная подсветка","category":"Светодиодные ленты","price":146500,"currency":"UZS","image":"","published":true,"source_url":"https://www.eman.uz/ru/product/219/list/"},
+    {"id":"demo-002","sku":"AQ-FORM-16X16-END-GREY","name":"Заглушка для профиля AQ FORM углового 16х16 серая","brand":"YECHIM LIGHTING","eman_group":"Мебельная подсветка","category":"Комплектующие","price":3250,"currency":"UZS","image":"","published":true,"source_url":"https://www.eman.uz/ru/product/219/list/"},
+    {"id":"demo-003","sku":"AQ-SWITCH-TOUCH-DIM-12-24V","name":"Выключатель AQ SWITCH сенсорный с диммером для установки в профиль 12/24V 60/120W","brand":"YECHIM LIGHTING","eman_group":"Мебельная подсветка","category":"Выключатели","price":130375,"currency":"UZS","image":"","published":true,"source_url":"https://www.eman.uz/ru/product/219/list/"},
+    {"id":"demo-004","sku":"AQ-FORM-SURF-15X7-3M","name":"Профиль накладной AQ FORM для LED лент 15х7 3 м алюминий","brand":"YECHIM LIGHTING","eman_group":"Мебельная подсветка","category":"Профили","price":94375,"currency":"UZS","image":"","published":true,"source_url":"https://www.eman.uz/ru/product/219/list/"},
+    {"id":"demo-005","sku":"AQ-MAX-220-12-60W-IP20","name":"Блок питания AQ MAX 220V/12V IP20 60W","brand":"YECHIM LIGHTING","eman_group":"Мебельная подсветка","category":"Блоки питания","price":150625,"currency":"UZS","image":"","published":true,"source_url":"https://www.eman.uz/ru/product/219/list/"},
+    {"id":"demo-006","sku":"STARAX-DEMO","name":"Пример товара STARAX","brand":"STARAX","eman_group":"Starax","category":"Система хранения для гардеробной","price":0,"currency":"UZS","image":"","published":false,"source_url":"https://www.eman.uz/"}
+  ]
+}
