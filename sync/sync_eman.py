@@ -5,6 +5,7 @@ YECHIM-only fields stay in Supabase table yechim_enrichment and are never overwr
 The job is designed for GitHub Actions at 08:00 Asia/Tashkent (03:00 UTC).
 """
 from __future__ import annotations
+import html as html_module
 import json, os, re, time
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -110,20 +111,32 @@ def parse_detail(url: str, fallback_name: str, fallback_image: str, fallback_pri
 
     text = clean(s.get_text(' ', strip=True))
 
-    # Название
+    # -----------------------------------------------------
+    # НАЗВАНИЕ
+    # -----------------------------------------------------
+
     name = fallback_name
 
     h1 = s.find('h1')
+
     if h1:
         h1_text = clean(h1.get_text(' ', strip=True))
+
         if h1_text:
             name = h1_text
 
-    # Артикул из Eman НЕ используем.
-    # YECHIM SKU будет вводиться вручную через Dashboard.
+    # -----------------------------------------------------
+    # АРТИКУЛ YECHIM
+    # -----------------------------------------------------
+    # Eman-артикул автоматически НЕ забираем.
+    # Артикул YECHIM будет вводиться вручную через Dashboard.
+
     sku = ''
 
-    # Цена берётся из страницы товара.
+    # -----------------------------------------------------
+    # ЦЕНА
+    # -----------------------------------------------------
+
     prices = []
 
     for match in re.finditer(
@@ -141,107 +154,83 @@ def parse_detail(url: str, fallback_name: str, fallback_image: str, fallback_pri
     # -----------------------------------------------------
     # ФОТО
     # -----------------------------------------------------
+    # Eman хранит фотографии товаров в:
+    #
+    # https://www.eman.uz/media/product_images/...
+    #
+    # Поэтому ищем именно такие URL в HTML страницы.
+    # Другие изображения вообще не используем.
 
     image_candidates = []
 
-    # Open Graph
-    og_image = s.find(
-        'meta',
-        attrs={'property': 'og:image'}
+    html = html_module.unescape(str(s))
+
+    # Абсолютные URL
+    absolute_matches = re.findall(
+        r'https://www\.eman\.uz/media/product_images/[^"\')\s<>]+',
+        html,
+        flags=re.I
     )
 
-    if og_image:
-        src = og_image.get('content', '')
+    # Относительные URL
+    relative_matches = re.findall(
+        r'/media/product_images/[^"\')\s<>]+',
+        html,
+        flags=re.I
+    )
 
-        if src:
-            image_candidates.append(
-                absolute(src, url)
-            )
+    for match in absolute_matches + relative_matches:
 
-    # Контейнеры, в которых может находиться галерея товара
-    product_block = None
+        image_url = match
 
-    selectors = [
-        '[class*="product-detail"]',
-        '[class*="product-detail__"]',
-        '[class*="product-page"]',
-        '[class*="product-card"]',
-        'main'
-    ]
+        if image_url.startswith('/'):
+            image_url = absolute(image_url, url)
 
-    for selector in selectors:
-        product_block = s.select_one(selector)
+        # Убираем возможные HTML-хвосты
+        image_url = image_url.split('"')[0]
+        image_url = image_url.split("'")[0]
+        image_url = image_url.split(')')[0]
 
-        if product_block:
-            break
+        if image_url not in image_candidates:
+            image_candidates.append(image_url)
 
-    scope = product_block if product_block else s
-
-    # Обычные изображения
-    for img in scope.find_all('img'):
-        src = (
-            img.get('src')
-            or img.get('data-src')
-            or img.get('data-lazy-src')
-            or img.get('data-original')
-            or ''
-        )
-
-        if not src:
-            continue
-
-        image_candidates.append(
-            absolute(src, url)
-        )
-
-    def valid_image(image_url: str) -> bool:
-        low = (image_url or '').lower()
-
-        if not image_url:
-            return False
-
-        blocked = (
-            'mc.yandex.ru',
-            'yandex.ru/watch',
-            'google-analytics',
-            'favicon',
-            'logo',
-            'icon',
-            'menu',
-            'sprite',
-            'placeholder',
-            'badge',
-            'flag',
-            'language',
-            'telegram',
-            'whatsapp'
-        )
-
-        return not any(
-            item in low
-            for item in blocked
-        )
+    # -----------------------------------------------------
+    # ПРОВЕРКА ФОТО
+    # -----------------------------------------------------
 
     images = []
 
     for image_url in image_candidates:
-        if (
-            valid_image(image_url)
-            and image_url not in images
-        ):
+
+        if not image_url:
+            continue
+
+        low = image_url.lower()
+
+        blocked = (
+            'logo',
+            'icon',
+            'sprite',
+            'placeholder',
+            'flag',
+            'language'
+        )
+
+        if any(item in low for item in blocked):
+            continue
+
+        if image_url not in images:
             images.append(image_url)
 
-    # Если не смогли надёжно определить фото,
-    # не используем fallback_image:
-    # лучше пусто, чем неправильное изображение.
+    # Первое изображение становится главным.
+    # Если не нашли — оставляем пусто.
     main_image = images[0] if images else ''
 
     # -----------------------------------------------------
-    # Дополнительные характеристики
+    # EXTRA
     # -----------------------------------------------------
-    # Eman extra НЕ импортируем.
-    # Дополнительные характеристики YECHIM
-    # заполняются вручную через Dashboard.
+    # Eman-характеристики автоматически НЕ импортируем.
+    # Их будем заполнять вручную через YECHIM Dashboard.
 
     extra = {}
 
