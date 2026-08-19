@@ -189,7 +189,81 @@ def parse_detail(url: str, fallback_name: str, fallback_image: str, fallback_pri
         if valid_image(u) and u not in images:
             images.append(u)
 
-    main_image = images[0] if images else fallback_image
+    # Фото товара
+    # Берём только изображения из блока карточки товара.
+    # Если надёжно найти не удалось — оставляем пустым,
+    # чтобы никогда не показывать служебную картинку.
+
+image_candidates = []
+
+# 1. Ищем контейнер карточки товара.
+product_block = None
+
+for selector in [
+    'main',
+    '[class*="product-detail"]',
+    '[class*="product-card"]',
+    '[class*="product-detail"]',
+    '[class*="detail"]'
+]:
+    product_block = s.select_one(selector)
+    if product_block:
+        break
+
+# 2. Open Graph используем только как запасной вариант,
+# если это явно не служебная картинка.
+if og_image := s.find('meta', attrs={'property': 'og:image'}):
+    src = og_image.get('content', '')
+    if src:
+        image_candidates.append(absolute(src, url))
+
+# 3. Изображения внутри найденного блока товара.
+scope = product_block or s
+
+for img in scope.find_all('img'):
+    src = (
+        img.get('src')
+        or img.get('data-src')
+        or img.get('data-lazy-src')
+        or img.get('data-original')
+        or ''
+    )
+
+    if src:
+        image_candidates.append(
+            absolute(src, url)
+        )
+
+def valid_image(u: str) -> bool:
+    low = (u or '').lower()
+
+    if not u:
+        return False
+
+    blocked = (
+        'mc.yandex.ru',
+        'yandex.ru/watch',
+        'google-analytics',
+        'favicon',
+        'logo',
+        'icon',
+        'menu',
+        'sprite',
+        'placeholder',
+        'badge',
+        'flag',
+        'language'
+    )
+
+    return not any(x in low for x in blocked)
+
+images = []
+
+for u in image_candidates:
+    if valid_image(u) and u not in images:
+        images.append(u)
+
+main_image = images[0] if images else ''
 
     # Дополнительные характеристики YECHIM
     # заполняются вручную через Dashboard.
