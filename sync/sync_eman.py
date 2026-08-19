@@ -266,7 +266,7 @@ for u in image_candidates:
 main_image = images[0] if images else ''
 
     # Дополнительные характеристики YECHIM
-    # заполняются вручную через Dashboard.
+    # будут заполняться вручную через Dashboard.
     extra = {}
 
     return {
