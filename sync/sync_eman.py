@@ -191,9 +191,9 @@ def parse_detail(url: str, fallback_name: str, fallback_image: str, fallback_pri
 
     main_image = images[0] if images else fallback_image
 
-# Дополнительные характеристики YECHIM
-# заполняются вручную через Dashboard.
-extra = {}
+    # Дополнительные характеристики YECHIM
+    # заполняются вручную через Dashboard.
+    extra = {}
 
     return {
         'sku': sku,
@@ -202,7 +202,6 @@ extra = {}
         'price': price,
         'extra': extra
     }
-
 
 def parse_list_page(url: str, brand: str, group: str):
     s=soup(url)
