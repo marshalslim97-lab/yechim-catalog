@@ -27,11 +27,12 @@ jobs:
 
       - name: Prepare Pages artifact
         run: |
-          mkdir -p _site/dashboard
-          cp index.html app.js styles.css supabase-config.js _site/
-          cp -r dashboard/* _site/dashboard/
-          cp -r data _site/data
-          cp -r assets _site/assets
+         mkdir -p _site/dashboard
+         cp index.html app.js styles.css supabase-config.js _site/
+         cp -r dashboard/* _site/dashboard/
+         mkdir -p _site/data _site/assets
+         cp -r data/* _site/data/ 2>/dev/null || true
+         cp -r assets/* _site/assets/ 2>/dev/null || true
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4
