@@ -103,7 +103,7 @@ def parse_detail(url: str, fallback_name: str, fallback_image: str, fallback_pri
         return {
             'sku': '',
             'name': fallback_name,
-            'image_url': fallback_image,
+            'image_url': '',
             'price': fallback_price,
             'extra': {}
         }
@@ -112,44 +112,73 @@ def parse_detail(url: str, fallback_name: str, fallback_image: str, fallback_pri
 
     # Название
     name = fallback_name
+
     h1 = s.find('h1')
     if h1:
         h1_text = clean(h1.get_text(' ', strip=True))
         if h1_text:
             name = h1_text
 
-    # YECHIM SKU/артикул НЕ берём из Eman.
-    # Он будет добавляться вручную через Dashboard.
+    # Артикул из Eman НЕ используем.
+    # YECHIM SKU будет вводиться вручную через Dashboard.
     sku = ''
 
-    # Цена:
-    # Берём все найденные суммы и выбираем наиболее вероятную
-    # отображаемую цену, игнорируя мелкие технические значения.
+    # Цена берётся из страницы товара.
     prices = []
 
     for match in re.finditer(
-        r'([0-9][0-9\s\u00a0.,]*)\s*(?:so[‘’\'`]m|сум|сўм|UZS)',
+        r'([0-9][0-9\s\u00a0.,]*)\s*(?:so[‘’\'`]?m|сум|сўм|UZS)',
         text,
         re.I
     ):
         value = to_number(match.group(1))
+
         if value > 0:
             prices.append(value)
 
-    price = max(prices) if prices else None
+    price = max(prices) if prices else fallback_price
 
-    # Фото:
-    # Сначала пробуем Open Graph — обычно это главное фото товара.
+    # -----------------------------------------------------
+    # ФОТО
+    # -----------------------------------------------------
+
     image_candidates = []
 
-    og_image = s.find('meta', attrs={'property': 'og:image'})
-    if og_image and og_image.get('content'):
-        image_candidates.append(
-            absolute(og_image.get('content'), url)
-        )
+    # Open Graph
+    og_image = s.find(
+        'meta',
+        attrs={'property': 'og:image'}
+    )
 
-    # Затем обычные изображения.
-    for img in s.find_all('img'):
+    if og_image:
+        src = og_image.get('content', '')
+
+        if src:
+            image_candidates.append(
+                absolute(src, url)
+            )
+
+    # Контейнеры, в которых может находиться галерея товара
+    product_block = None
+
+    selectors = [
+        '[class*="product-detail"]',
+        '[class*="product-detail__"]',
+        '[class*="product-page"]',
+        '[class*="product-card"]',
+        'main'
+    ]
+
+    for selector in selectors:
+        product_block = s.select_one(selector)
+
+        if product_block:
+            break
+
+    scope = product_block if product_block else s
+
+    # Обычные изображения
+    for img in scope.find_all('img'):
         src = (
             img.get('src')
             or img.get('data-src')
@@ -161,12 +190,14 @@ def parse_detail(url: str, fallback_name: str, fallback_image: str, fallback_pri
         if not src:
             continue
 
-        image_candidates.append(absolute(src, url))
+        image_candidates.append(
+            absolute(src, url)
+        )
 
-    def valid_image(u: str) -> bool:
-        low = (u or '').lower()
+    def valid_image(image_url: str) -> bool:
+        low = (image_url or '').lower()
 
-        if not u:
+        if not image_url:
             return False
 
         blocked = (
@@ -178,95 +209,40 @@ def parse_detail(url: str, fallback_name: str, fallback_image: str, fallback_pri
             'icon',
             'menu',
             'sprite',
-            'placeholder'
+            'placeholder',
+            'badge',
+            'flag',
+            'language',
+            'telegram',
+            'whatsapp'
         )
 
-        return not any(x in low for x in blocked)
+        return not any(
+            item in low
+            for item in blocked
+        )
 
     images = []
 
-    for u in image_candidates:
-        if valid_image(u) and u not in images:
-            images.append(u)
+    for image_url in image_candidates:
+        if (
+            valid_image(image_url)
+            and image_url not in images
+        ):
+            images.append(image_url)
 
-    # Фото товара
-    # Берём только изображения из блока карточки товара.
-    # Если надёжно найти не удалось — оставляем пустым,
-    # чтобы никогда не показывать служебную картинку.
+    # Если не смогли надёжно определить фото,
+    # не используем fallback_image:
+    # лучше пусто, чем неправильное изображение.
+    main_image = images[0] if images else ''
 
-image_candidates = []
-
-# 1. Ищем контейнер карточки товара.
-product_block = None
-
-for selector in [
-    'main',
-    '[class*="product-detail"]',
-    '[class*="product-card"]',
-    '[class*="product-detail"]',
-    '[class*="detail"]'
-]:
-    product_block = s.select_one(selector)
-    if product_block:
-        break
-
-# 2. Open Graph используем только как запасной вариант,
-# если это явно не служебная картинка.
-if og_image := s.find('meta', attrs={'property': 'og:image'}):
-    src = og_image.get('content', '')
-    if src:
-        image_candidates.append(absolute(src, url))
-
-# 3. Изображения внутри найденного блока товара.
-scope = product_block or s
-
-for img in scope.find_all('img'):
-    src = (
-        img.get('src')
-        or img.get('data-src')
-        or img.get('data-lazy-src')
-        or img.get('data-original')
-        or ''
-    )
-
-    if src:
-        image_candidates.append(
-            absolute(src, url)
-        )
-
-def valid_image(u: str) -> bool:
-    low = (u or '').lower()
-
-    if not u:
-        return False
-
-    blocked = (
-        'mc.yandex.ru',
-        'yandex.ru/watch',
-        'google-analytics',
-        'favicon',
-        'logo',
-        'icon',
-        'menu',
-        'sprite',
-        'placeholder',
-        'badge',
-        'flag',
-        'language'
-    )
-
-    return not any(x in low for x in blocked)
-
-images = []
-
-for u in image_candidates:
-    if valid_image(u) and u not in images:
-        images.append(u)
-
-main_image = images[0] if images else ''
-
+    # -----------------------------------------------------
+    # Дополнительные характеристики
+    # -----------------------------------------------------
+    # Eman extra НЕ импортируем.
     # Дополнительные характеристики YECHIM
-    # будут заполняться вручную через Dashboard.
+    # заполняются вручную через Dashboard.
+
     extra = {}
 
     return {
@@ -276,7 +252,6 @@ main_image = images[0] if images else ''
         'price': price,
         'extra': extra
     }
-
 def parse_list_page(url: str, brand: str, group: str):
     s=soup(url)
     results=[]
