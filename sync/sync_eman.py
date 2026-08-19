@@ -175,7 +175,7 @@ def supabase_upsert(products):
     sb_url=os.environ['SUPABASE_URL'].rstrip('/')
     key=os.environ['SUPABASE_SERVICE_ROLE_KEY']
     endpoint=f'{sb_url}/rest/v1/eman_products?on_conflict=eman_id'
-    headers={'apikey':key,'Authorization':f'Bearer {key}','Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'}
+    headers={"apikey": key, "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates,return=minimal"}
     rows=[{
         'eman_id':p.eman_id,'source_url':p.source_url,'sku':p.sku,'name':p.name,'brand':p.brand,
         'eman_group':p.eman_group,'category':p.category,'price':p.price,'currency':p.currency,
