@@ -89,7 +89,7 @@ select{
 
   border-radius:12px;
 
-  background:#fff;
+  background:transparent;
 
   flex-shrink:0;
 }
