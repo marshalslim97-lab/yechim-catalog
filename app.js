@@ -21,7 +21,7 @@ const state = {
   query: '',
   selectedBrand: null,
   selectedCategory: null,
-  productId: new URLSearchParams(location.search).get('product')
+  productId: null
 };
 
 const CART_KEY = 'yechim_cart_v2';
@@ -36,9 +36,56 @@ try {
   cart = {};
 }
 
-/* =========================================
+/* =========================
+   BRAND PRESENTATION
+========================= */
+
+const BRANDS = {
+  'STARAX': {
+    logo: './assets/brands/STARAX.png',
+    background: './assets/backgrounds/STARAX BACKGROUND.jpg',
+    title: 'STARAX',
+    description:
+      'Системы хранения и механизмы для кухни, гардеробных и другой мебели.'
+  },
+
+  'SAMET': {
+    logo: './assets/brands/SAMET.png',
+    background: './assets/backgrounds/SAMET BACKGROUND.webp',
+    title: 'SAMET',
+    description:
+      'Петли, направляющие и механизмы для современной мебели.'
+  },
+
+  'CEBI': {
+    logo: './assets/brands/CEBI.png',
+    background: './assets/backgrounds/CEBI BACKGROUND.png',
+    title: 'CEBI',
+    description:
+      'Мебельные ручки и крючки для стильных мебельных решений.'
+  },
+
+  'MESAN': {
+    logo: './assets/brands/MESAN.png',
+    background: './assets/backgrounds/MESAN BACKGROUND.webp',
+    title: 'MESAN',
+    description:
+      'Крепёж и соединительные решения для производства мебели.'
+  },
+
+  'YECHIM LIGHTING': {
+    logo: './assets/brands/YECHIM LIGHTING.png',
+    background:
+      './assets/backgrounds/YECHIM LIGHTING BACKGROUND.jpg',
+    title: 'YECHIM LIGHTING',
+    description:
+      'Мебельная подсветка и световые решения для современной мебели.'
+  }
+};
+
+/* =========================
    HELPERS
-========================================= */
+========================= */
 
 const esc = (s) =>
   String(s ?? '').replace(
@@ -48,7 +95,7 @@ const esc = (s) =>
         '&': '&amp;',
         '<': '&lt;',
         '>': '&gt;',
-        '"': '&#039;',
+        '"': '&quot;',
         "'": '&#039;'
       }[c])
   );
@@ -56,140 +103,13 @@ const esc = (s) =>
 const money = (v) =>
   Number(v || 0).toLocaleString('ru-RU') + ' сум';
 
-const productUrl = (id) =>
-  `?product=${encodeURIComponent(id)}`;
-
 const normalize = (x) =>
   String(x ?? '').toLowerCase().trim();
 
-const goHome = () => {
-  history.pushState({}, '', './');
-  state.productId = null;
-  state.selectedBrand = null;
-  state.selectedCategory = null;
-  renderHome();
-};
+const productUrl = (id) =>
+  `?product=${encodeURIComponent(id)}`;
 
-const goBrand = (brand) => {
-  history.pushState(
-    {},
-    '',
-    `?brand=${encodeURIComponent(brand)}`
-  );
-
-  state.productId = null;
-  state.selectedBrand = brand;
-  state.selectedCategory = null;
-
-  renderBrandCategories();
-};
-
-const goCategory = (brand, category) => {
-  history.pushState(
-    {},
-    '',
-    `?brand=${encodeURIComponent(
-      brand
-    )}&category=${encodeURIComponent(category)}`
-  );
-
-  state.productId = null;
-  state.selectedBrand = brand;
-  state.selectedCategory = category;
-
-  renderCategoryProducts();
-};
-
-/* =========================================
-   LOAD PRODUCTS
-========================================= */
-
-async function loadProducts() {
-
-  try {
-
-    if (db) {
-
-      const { data, error } =
-        await db.rpc('get_public_catalog');
-
-      if (error) {
-        throw error;
-      }
-
-      state.products = (data || []).map((p) => ({
-        id: p.eman_id,
-        eman_id: p.eman_id,
-        source_url: p.source_url,
-
-        sku: p.sku || '',
-
-        name: p.name,
-
-        brand: p.brand,
-
-        category:
-          p.category || 'Без категории',
-
-        subcategory:
-          p.subcategory || '',
-
-        price: p.price,
-
-        currency: p.currency,
-
-        image: p.image_url,
-
-        description: p.description,
-
-        specs: p.specs || {},
-
-        mounting_scheme:
-          p.mounting_scheme_url,
-
-        additional_images:
-          p.additional_images || [],
-
-        badge: p.badge
-      }));
-
-    } else {
-
-      const r =
-        await fetch('data/products.json');
-
-      const raw = await r.json();
-
-      state.products =
-        raw.products || [];
-    }
-
-  } catch (e) {
-
-    state.products = [];
-
-    document.querySelector('#app').innerHTML = `
-      <div class="shell">
-        <div class="panel error">
-          <b>Каталог временно недоступен.</b>
-          <div class="muted">
-            ${esc(e.message || e)}
-          </div>
-        </div>
-      </div>
-    `;
-
-  } finally {
-
-    state.loading = false;
-  }
-}
-
-/* =========================================
-   CART
-========================================= */
-
-function persistCart() {
+function saveCart() {
 
   localStorage.setItem(
     CART_KEY,
@@ -219,6 +139,174 @@ function updateCartBadge() {
   }
 }
 
+/* =========================
+   ROUTER
+========================= */
+
+function readRoute() {
+
+  const params =
+    new URLSearchParams(
+      location.search
+    );
+
+  return {
+    product: params.get('product'),
+    brand: params.get('brand'),
+    category: params.get('category')
+  };
+}
+
+function renderRoute() {
+
+  const route =
+    readRoute();
+
+  state.productId =
+    route.product;
+
+  state.selectedBrand =
+    route.brand;
+
+  state.selectedCategory =
+    route.category;
+
+  if (route.product) {
+
+    renderDetail();
+
+  } else if (
+    route.brand &&
+    route.category
+  ) {
+
+    renderCategoryProducts();
+
+  } else if (route.brand) {
+
+    renderBrandCategories();
+
+  } else {
+
+    renderHome();
+  }
+}
+
+window.addEventListener(
+  'popstate',
+  renderRoute
+);
+
+/* =========================
+   DATA
+========================= */
+
+async function loadProducts() {
+
+  try {
+
+    if (db) {
+
+      const {
+        data,
+        error
+      } = await db.rpc(
+        'get_public_catalog'
+      );
+
+      if (error) {
+        throw error;
+      }
+
+      state.products =
+        (data || []).map((p) => ({
+          id: p.eman_id,
+          eman_id: p.eman_id,
+          source_url: p.source_url,
+
+          sku: p.yechim_sku || p.sku || '',
+
+          name: p.name,
+
+          brand: p.brand,
+
+          category:
+            p.category || 'Без категории',
+
+          subcategory:
+            p.subcategory || '',
+
+          price: p.price,
+
+          currency: p.currency,
+
+          image: p.image_url,
+
+          description:
+            p.description,
+
+          specs:
+            p.specs || {},
+
+          mounting_scheme:
+            p.mounting_scheme_url,
+
+          additional_images:
+            p.additional_images || [],
+
+          badge:
+            p.badge,
+
+          sort_order:
+            p.sort_order || 0
+        }));
+
+    } else {
+
+      const r =
+        await fetch(
+          'data/products.json'
+        );
+
+      const raw =
+        await r.json();
+
+      state.products =
+        raw.products || [];
+    }
+
+  } catch (e) {
+
+    state.products = [];
+
+    document.querySelector(
+      '#app'
+    ).innerHTML = `
+      <div class="shell">
+        <div class="panel error">
+          <b>
+            Каталог временно недоступен.
+          </b>
+
+          <div class="muted">
+            ${esc(
+              e.message || e
+            )}
+          </div>
+        </div>
+      </div>
+    `;
+
+  } finally {
+
+    state.loading = false;
+  }
+}
+
+/* =========================
+   CART
+========================= */
+
 function add(id, delta = 1) {
 
   const key = String(id);
@@ -227,7 +315,8 @@ function add(id, delta = 1) {
     Number(cart[key] || 0);
 
   const next =
-    current + Number(delta || 0);
+    current +
+    Number(delta || 0);
 
   if (next <= 0) {
     delete cart[key];
@@ -235,19 +324,14 @@ function add(id, delta = 1) {
     cart[key] = next;
   }
 
-  persistCart();
+  saveCart();
 
-  if (state.productId) {
-    renderDetail();
-  } else if (
-    state.selectedBrand &&
-    state.selectedCategory
+  if (
+    state.productId
   ) {
-    renderCategoryProducts();
-  } else if (state.selectedBrand) {
-    renderBrandCategories();
+    renderDetail();
   } else {
-    renderHome();
+    renderRoute();
   }
 }
 
@@ -255,49 +339,47 @@ function clearCart() {
 
   cart = {};
 
-  persistCart();
+  saveCart();
 
-  const drawer =
-    document.querySelector('.cart-drawer');
-
-  if (drawer) {
-    renderCart();
-  }
+  renderCart();
 }
 
-/* =========================================
+/* =========================
    HOME
-========================================= */
+========================= */
 
 function renderHome() {
 
   state.productId = null;
-  state.selectedBrand = null;
-  state.selectedCategory = null;
-
-  history.replaceState({}, '', './');
 
   document.title =
     'YECHIM — Решения для вашей мебели';
 
-  const brands = [
-    'STARAX',
-    'SAMET',
-    'CEBI',
-    'MESAN',
-    'YECHIM LIGHTING'
-  ];
+  const popular =
+    state.products
+      .filter((p) =>
+        normalize(p.badge)
+          .includes('популяр')
+      )
+      .slice(0, 8);
 
-  document.querySelector('#app').innerHTML = `
+  const newProducts =
+    state.products
+      .filter((p) =>
+        normalize(p.badge)
+          .includes('нов')
+      )
+      .slice(0, 8);
+
+  document.querySelector(
+    '#app'
+  ).innerHTML = `
 
     <div class="shell">
 
       <section class="catalog-head">
 
         <div>
-          <div class="eyebrow">
-            YECHIM
-          </div>
 
           <h1>
             Каталог
@@ -306,6 +388,7 @@ function renderHome() {
           <p class="muted">
             Решения для вашей мебели
           </p>
+
         </div>
 
         <div class="search wide">
@@ -313,7 +396,6 @@ function renderHome() {
           <input
             id="q"
             placeholder="Найти товар или артикул"
-            value="${esc(state.query)}"
           >
 
           <button
@@ -328,24 +410,77 @@ function renderHome() {
 
       </section>
 
+
       <section>
 
         <div class="section-head">
-          <h2>Бренды</h2>
+
+          <h2>
+            Бренды
+          </h2>
+
         </div>
 
         <div class="brand-grid">
 
-          ${brands
+          ${Object.entries(
+            BRANDS
+          )
             .map(
-              (brand) => `
-                <button
-                  class="brand"
+              ([brand, data]) => `
+
+                <article
+                  class="brand-card"
                   data-brand="${esc(brand)}"
-                  type="button"
                 >
-                  ${esc(brand)}
-                </button>
+
+                  <div
+                    class="brand-visual"
+                    style="
+                      background-image:
+                        url('${data.background}');
+                    "
+                  >
+
+                    <img
+                      class="brand-logo"
+                      src="${data.logo}"
+                      alt="${esc(
+                        data.title
+                      )}"
+                    >
+
+                  </div>
+
+                  <div
+                    class="brand-description"
+                  >
+
+                    <div
+                      class="brand-description-title"
+                    >
+                      ${esc(
+                        data.title
+                      )}
+                    </div>
+
+                    <div
+                      class="brand-description-text"
+                    >
+                      ${esc(
+                        data.description
+                      )}
+                    </div>
+
+                    <span
+                      class="brand-arrow"
+                    >
+                      Смотреть категории →
+                    </span>
+
+                  </div>
+
+                </article>
               `
             )
             .join('')}
@@ -354,16 +489,102 @@ function renderHome() {
 
       </section>
 
+
+      ${
+        popular.length
+          ? `
+
+            <section>
+
+              <div class="section-head">
+
+                <h2>
+                  Популярные решения
+                </h2>
+
+              </div>
+
+              <div class="products">
+
+                ${popular
+                  .map(productCard)
+                  .join('')}
+
+              </div>
+
+            </section>
+
+          `
+          : ''
+      }
+
+
+      ${
+        newProducts.length
+          ? `
+
+            <section>
+
+              <div class="section-head">
+
+                <h2>
+                  Новинки
+                </h2>
+
+              </div>
+
+              <div class="products">
+
+                ${newProducts
+                  .map(productCard)
+                  .join('')}
+
+              </div>
+
+            </section>
+
+          `
+          : ''
+      }
+
+
+      <section
+        class="home-promo"
+      >
+
+        <div>
+
+          <h2>
+            Найдите нужное решение
+          </h2>
+
+          <p>
+            Ищите товар по названию
+            или артикулу и отправляйте
+            заявку менеджеру прямо
+            из каталога.
+          </p>
+
+        </div>
+
+        <div
+          class="home-promo-stat"
+        >
+          ${state.products.length}
+          товаров в каталоге
+        </div>
+
+      </section>
+
     </div>
   `;
-
-  const searchBtn =
-    document.querySelector('#searchBtn');
 
   const searchInput =
     document.querySelector('#q');
 
-  searchBtn.onclick = () => {
+  document.querySelector(
+    '#searchBtn'
+  ).onclick = () => {
 
     state.query =
       searchInput.value.trim();
@@ -371,7 +592,9 @@ function renderHome() {
     renderSearchResults();
   };
 
-  searchInput.onkeydown = (event) => {
+  searchInput.onkeydown = (
+    event
+  ) => {
 
     if (event.key === 'Enter') {
 
@@ -383,20 +606,31 @@ function renderHome() {
   };
 
   document
-    .querySelectorAll('[data-brand]')
-    .forEach((button) => {
+    .querySelectorAll(
+      '[data-brand]'
+    )
+    .forEach((card) => {
 
-      button.onclick = () => {
-        goBrand(button.dataset.brand);
+      card.onclick = () => {
+
+        history.pushState(
+          {},
+          '',
+          `?brand=${encodeURIComponent(
+            card.dataset.brand
+          )}`
+        );
+
+        renderRoute();
       };
     });
 
   updateCartBadge();
 }
 
-/* =========================================
-   BRAND → CATEGORIES
-========================================= */
+/* =========================
+   BRAND CATEGORIES
+========================= */
 
 function renderBrandCategories() {
 
@@ -405,32 +639,44 @@ function renderBrandCategories() {
 
   const products =
     state.products.filter(
-      (p) => normalize(p.brand) === normalize(brand)
+      (p) =>
+        normalize(p.brand) ===
+        normalize(brand)
     );
 
   const categories =
-    [...new Set(
-      products
-        .map((p) => p.category)
-        .filter(Boolean)
-    )]
-      .sort((a, b) =>
+    [
+      ...new Set(
+        products
+          .map(
+            (p) =>
+              p.category
+          )
+          .filter(Boolean)
+      )
+    ].sort(
+      (a, b) =>
         String(a).localeCompare(
           String(b),
           'ru'
         )
-      );
+    );
 
   document.title =
     `YECHIM — ${brand}`;
 
-  document.querySelector('#app').innerHTML = `
+  document.querySelector(
+    '#app'
+  ).innerHTML = `
 
     <div class="shell">
 
       <div class="breadcrumbs">
 
-        <a href="./" id="backHome">
+        <a
+          href="./"
+          id="backHome"
+        >
           Каталог
         </a>
 
@@ -462,53 +708,75 @@ function renderBrandCategories() {
         Категории товаров
       </p>
 
-      <section class="category-grid">
+      <section
+        class="category-grid"
+      >
 
         ${
           categories.length
             ? categories
-                .map((category) => {
+                .map(
+                  (category) => {
 
-                  const count =
-                    products.filter(
-                      (p) =>
-                        normalize(
-                          p.category
-                        ) ===
-                        normalize(category)
-                    ).length;
+                    const count =
+                      products.filter(
+                        (p) =>
+                          normalize(
+                            p.category
+                          ) ===
+                          normalize(
+                            category
+                          )
+                      ).length;
 
-                  return `
-                    <button
-                      class="category-card"
-                      data-category="${esc(category)}"
-                      type="button"
-                    >
+                    return `
+                      <button
+                        class="category-card"
+                        data-category="${esc(
+                          category
+                        )}"
+                        type="button"
+                      >
 
-                      <div class="category-card-title">
-                        ${esc(category)}
-                      </div>
+                        <div
+                          class="category-card-title"
+                        >
+                          ${esc(
+                            category
+                          )}
+                        </div>
 
-                      <div class="category-card-count">
-                        ${count} ${
-                          count === 1
-                            ? 'товар'
-                            : 'товаров'
-                        }
-                      </div>
+                        <div
+                          class="category-card-count"
+                        >
+                          ${count}
+                          ${
+                            count === 1
+                              ? 'товар'
+                              : 'товаров'
+                          }
+                        </div>
 
-                    </button>
-                  `;
-                })
+                      </button>
+                    `;
+                  }
+                )
                 .join('')
             : `
               <div class="panel">
-                <b>Категории пока не определены.</b>
+
+                <b>
+                  Категории пока не определены.
+                </b>
 
                 <div class="muted">
-                  Для этого бренда в базе Eman ещё не заполнена
-                  категория товара.
+
+                  Для этого бренда
+                  в текущем источнике
+                  ещё нет детальной категории.
+
                 </div>
+
               </div>
             `
         }
@@ -518,36 +786,62 @@ function renderBrandCategories() {
     </div>
   `;
 
-  document.querySelector('#backHome').onclick =
-    (event) => {
+  document.querySelector(
+    '#backHome'
+  ).onclick = (event) => {
 
-      event.preventDefault();
+    event.preventDefault();
 
-      goHome();
-    };
+    history.pushState(
+      {},
+      '',
+      './'
+    );
 
-  document.querySelector('#backBrand').onclick =
-    goHome;
+    renderRoute();
+  };
+
+  document.querySelector(
+    '#backBrand'
+  ).onclick = () => {
+
+    history.pushState(
+      {},
+      '',
+      './'
+    );
+
+    renderRoute();
+  };
 
   document
-    .querySelectorAll('[data-category]')
+    .querySelectorAll(
+      '[data-category]'
+    )
     .forEach((button) => {
 
       button.onclick = () => {
 
-        goCategory(
-          brand,
-          button.dataset.category
+        history.pushState(
+          {},
+          '',
+          `?brand=${encodeURIComponent(
+            brand
+          )}&category=${encodeURIComponent(
+            button.dataset.category
+          )}`
         );
+
+        renderRoute();
       };
     });
 
   updateCartBadge();
 }
 
-/* =========================================
-   CATEGORY → PRODUCTS
-========================================= */
+/* =========================
+   CATEGORY PRODUCTS
+========================= */
 
 function renderCategoryProducts() {
 
@@ -569,19 +863,27 @@ function renderCategoryProducts() {
   document.title =
     `YECHIM — ${category}`;
 
-  document.querySelector('#app').innerHTML = `
+  document.querySelector(
+    '#app'
+  ).innerHTML = `
 
     <div class="shell">
 
       <div class="breadcrumbs">
 
-        <a href="./" id="categoryHome">
+        <a
+          href="./"
+          id="categoryHome"
+        >
           Каталог
         </a>
 
         <span>›</span>
 
-        <a href="#" id="categoryBrand">
+        <a
+          href="#"
+          id="categoryBrand"
+        >
           ${esc(brand)}
         </a>
 
@@ -596,6 +898,7 @@ function renderCategoryProducts() {
       <div class="section-head">
 
         <div>
+
           <div class="eyebrow">
             ${esc(brand)}
           </div>
@@ -603,6 +906,7 @@ function renderCategoryProducts() {
           <h1>
             ${esc(category)}
           </h1>
+
         </div>
 
         <button
@@ -617,7 +921,6 @@ function renderCategoryProducts() {
 
       <section
         class="products"
-        id="products"
       >
 
         ${
@@ -627,9 +930,12 @@ function renderCategoryProducts() {
                 .join('')
             : `
               <div class="panel">
+
                 <b>
-                  В этой категории пока нет товаров.
+                  В этой категории пока
+                  нет опубликованных товаров.
                 </b>
+
               </div>
             `
         }
@@ -639,35 +945,59 @@ function renderCategoryProducts() {
     </div>
   `;
 
-  document.querySelector('#categoryHome').onclick =
-    (event) => {
+  document.querySelector(
+    '#categoryHome'
+  ).onclick = (event) => {
 
-      event.preventDefault();
+    event.preventDefault();
 
-      goHome();
-    };
+    history.pushState(
+      {},
+      '',
+      './'
+    );
 
-  document.querySelector('#categoryBrand').onclick =
-    (event) => {
+    renderRoute();
+  };
 
-      event.preventDefault();
+  document.querySelector(
+    '#categoryBrand'
+  ).onclick = (event) => {
 
-      goBrand(brand);
-    };
+    event.preventDefault();
+
+    history.pushState(
+      {},
+      '',
+      `?brand=${encodeURIComponent(
+        brand
+      )}`
+    );
+
+    renderRoute();
+  };
 
   document.querySelector(
     '#backToCategories'
   ).onclick = () => {
 
-    goBrand(brand);
+    history.pushState(
+      {},
+      '',
+      `?brand=${encodeURIComponent(
+        brand
+      )}`
+    );
+
+    renderRoute();
   };
 
   updateCartBadge();
 }
 
-/* =========================================
+/* =========================
    SEARCH
-========================================= */
+========================= */
 
 function renderSearchResults() {
 
@@ -675,32 +1005,43 @@ function renderSearchResults() {
     normalize(state.query);
 
   const products =
-    state.products.filter((p) => {
+    state.products.filter(
+      (p) => {
 
-      const haystack = [
-        p.name,
-        p.sku,
-        p.brand,
-        p.category,
-        p.subcategory
-      ]
-        .filter(Boolean)
-        .map(normalize)
-        .join(' ');
+        const haystack =
+          [
+            p.name,
+            p.sku,
+            p.brand,
+            p.category,
+            p.subcategory
+          ]
+            .filter(Boolean)
+            .map(normalize)
+            .join(' ');
 
-      return !q || haystack.includes(q);
-    });
+        return (
+          !q ||
+          haystack.includes(q)
+        );
+      }
+    );
 
   document.title =
-    `YECHIM — Поиск`;
+    'YECHIM — Поиск';
 
-  document.querySelector('#app').innerHTML = `
+  document.querySelector(
+    '#app'
+  ).innerHTML = `
 
     <div class="shell">
 
       <div class="breadcrumbs">
 
-        <a href="./" id="searchHome">
+        <a
+          href="./"
+          id="searchHome"
+        >
           Каталог
         </a>
 
@@ -712,25 +1053,19 @@ function renderSearchResults() {
 
       </div>
 
-      <section class="catalog-head">
+      <section
+        class="catalog-head"
+      >
 
         <div>
-
-          <div class="eyebrow">
-            YECHIM
-          </div>
 
           <h1>
             Поиск
           </h1>
 
           <p class="muted">
+            Найдено:
             ${products.length}
-            ${
-              products.length === 1
-                ? 'товар'
-                : 'товаров'
-            }
           </p>
 
         </div>
@@ -739,8 +1074,10 @@ function renderSearchResults() {
 
           <input
             id="searchInput"
-            value="${esc(state.query)}"
-            placeholder="Найти товар или артикул"
+            value="${esc(
+              state.query
+            )}"
+            placeholder="Название или артикул"
           >
 
           <button
@@ -755,7 +1092,9 @@ function renderSearchResults() {
 
       </section>
 
-      <section class="products">
+      <section
+        class="products"
+      >
 
         ${
           products.length
@@ -764,6 +1103,7 @@ function renderSearchResults() {
                 .join('')
             : `
               <div class="panel">
+
                 <b>
                   Ничего не найдено.
                 </b>
@@ -771,6 +1111,7 @@ function renderSearchResults() {
                 <div class="muted">
                   Попробуйте другой запрос.
                 </div>
+
               </div>
             `
         }
@@ -780,21 +1121,32 @@ function renderSearchResults() {
     </div>
   `;
 
-  document.querySelector('#searchHome').onclick =
-    (event) => {
+  document.querySelector(
+    '#searchHome'
+  ).onclick = (event) => {
 
-      event.preventDefault();
+    event.preventDefault();
 
-      goHome();
-    };
+    history.pushState(
+      {},
+      '',
+      './'
+    );
+
+    renderRoute();
+  };
 
   const input =
-    document.querySelector('#searchInput');
+    document.querySelector(
+      '#searchInput'
+    );
 
-  const searchAgain =
-    document.querySelector('#searchAgain');
+  const button =
+    document.querySelector(
+      '#searchAgain'
+    );
 
-  const executeSearch = () => {
+  const runSearch = () => {
 
     state.query =
       input.value.trim();
@@ -802,29 +1154,29 @@ function renderSearchResults() {
     renderSearchResults();
   };
 
-  searchAgain.onclick =
-    executeSearch;
+  button.onclick =
+    runSearch;
 
-  input.onkeydown = (event) => {
+  input.onkeydown =
+    (event) => {
 
-    if (event.key === 'Enter') {
-      executeSearch();
-    }
-  };
+      if (event.key === 'Enter') {
+        runSearch();
+      }
+    };
 
   updateCartBadge();
 }
 
-/* =========================================
+/* =========================
    PRODUCT CARD
-========================================= */
+========================= */
 
 function productCard(p) {
 
   return `
     <article
       class="product"
-      data-product-card="${encodeURIComponent(p.id)}"
     >
 
       <a
@@ -838,8 +1190,12 @@ function productCard(p) {
             p.image
               ? `
                 <img
-                  src="${esc(p.image)}"
-                  alt="${esc(p.name)}"
+                  src="${esc(
+                    p.image
+                  )}"
+                  alt="${esc(
+                    p.name
+                  )}"
                   loading="lazy"
                 >
               `
@@ -852,7 +1208,9 @@ function productCard(p) {
 
         </div>
 
-        <div class="product-body">
+        <div
+          class="product-body"
+        >
 
           <div class="brand-mini">
             ${esc(p.brand)}
@@ -862,13 +1220,16 @@ function productCard(p) {
             ${esc(p.name)}
           </h3>
 
-          <div class="sku">
-            ${
-              p.sku
-                ? `Артикул: ${esc(p.sku)}`
-                : ''
-            }
-          </div>
+          ${
+            p.sku
+              ? `
+                <div class="sku">
+                  Артикул:
+                  ${esc(p.sku)}
+                </div>
+              `
+              : ''
+          }
 
           ${
             p.badge
@@ -902,7 +1263,9 @@ function productCard(p) {
           <button
             class="btn btn-primary"
             type="button"
-            data-add="${encodeURIComponent(p.id)}"
+            data-add="${encodeURIComponent(
+              p.id
+            )}"
           >
             В корзину
           </button>
@@ -915,22 +1278,25 @@ function productCard(p) {
   `;
 }
 
-/* =========================================
-   PRODUCT DETAIL
-========================================= */
+/* =========================
+   DETAIL
+========================= */
 
 function getProduct() {
 
   return state.products.find(
     (x) =>
       String(x.id) ===
-      String(state.productId)
+      String(
+        state.productId
+      )
   );
 }
 
 function renderDetail() {
 
-  const p = getProduct();
+  const p =
+    getProduct();
 
   if (!p) {
     return renderHome();
@@ -939,18 +1305,25 @@ function renderDetail() {
   document.title =
     `YECHIM — ${p.name}`;
 
-  const thumbs = [
-    p.image,
-    ...(p.additional_images || [])
-  ].filter(Boolean);
+  const thumbs =
+    [
+      p.image,
+      ...(p.additional_images || [])
+    ]
+      .filter(Boolean);
 
-  document.querySelector('#app').innerHTML = `
+  document.querySelector(
+    '#app'
+  ).innerHTML = `
 
     <div class="shell">
 
       <div class="breadcrumbs">
 
-        <a href="./" id="detailHome">
+        <a
+          href="./"
+          id="detailHome"
+        >
           Каталог
         </a>
 
@@ -979,8 +1352,12 @@ function renderDetail() {
                 ? `
                   <img
                     id="mainImage"
-                    src="${esc(p.image)}"
-                    alt="${esc(p.name)}"
+                    src="${esc(
+                      p.image
+                    )}"
+                    alt="${esc(
+                      p.name
+                    )}"
                   >
                 `
                 : `
@@ -1006,12 +1383,16 @@ function renderDetail() {
                               ? 'active'
                               : ''
                           }"
-                          data-img="${esc(u)}"
+                          data-img="${esc(
+                            u
+                          )}"
                           type="button"
                         >
 
                           <img
-                            src="${esc(u)}"
+                            src="${esc(
+                              u
+                            )}"
                             alt=""
                           >
 
@@ -1041,7 +1422,8 @@ function renderDetail() {
             p.sku
               ? `
                 <div class="sku">
-                  Артикул: ${esc(p.sku)}
+                  Артикул:
+                  ${esc(p.sku)}
                 </div>
               `
               : ''
@@ -1057,7 +1439,9 @@ function renderDetail() {
               : ''
           }
 
-          <div class="price detail-price">
+          <div
+            class="price detail-price"
+          >
             ${
               p.price
                 ? money(p.price)
@@ -1077,7 +1461,7 @@ function renderDetail() {
                 −
               </button>
 
-              <b id="detailQty">
+              <b>
                 ${cart[p.id] || 0}
               </b>
 
@@ -1113,14 +1497,18 @@ function renderDetail() {
             p.description
               ? `
                 <p class="description">
-                  ${esc(p.description)}
+                  ${esc(
+                    p.description
+                  )}
                 </p>
               `
               : ''
           }
 
           ${
-            Object.keys(p.specs || {}).length
+            Object.keys(
+              p.specs || {}
+            ).length
               ? `
                 <div class="specs">
 
@@ -1152,7 +1540,9 @@ function renderDetail() {
           ${
             p.mounting_scheme
               ? `
-                <div class="extra-block">
+                <div
+                  class="extra-block"
+                >
 
                   <h3>
                     Схема присадки
@@ -1188,13 +1578,20 @@ function renderDetail() {
     </div>
   `;
 
-  document.querySelector('#detailHome').onclick =
-    (event) => {
+  document.querySelector(
+    '#detailHome'
+  ).onclick = (event) => {
 
-      event.preventDefault();
+    event.preventDefault();
 
-      goHome();
-    };
+    history.pushState(
+      {},
+      '',
+      './'
+    );
+
+    renderRoute();
+  };
 
   document
     .querySelectorAll('.thumb')
@@ -1202,54 +1599,66 @@ function renderDetail() {
 
       button.onclick = () => {
 
-        const mainImage =
+        const img =
           document.querySelector(
             '#mainImage'
           );
 
-        if (mainImage) {
-          mainImage.src =
+        if (img) {
+          img.src =
             button.dataset.img;
         }
 
         document
-          .querySelectorAll('.thumb')
-          .forEach((thumb) =>
-            thumb.classList.remove(
+          .querySelectorAll(
+            '.thumb'
+          )
+          .forEach((x) =>
+            x.classList.remove(
               'active'
             )
           );
 
-        button.classList.add('active');
+        button.classList.add(
+          'active'
+        );
       };
     });
 
-  document.querySelector('#minus').onclick =
-    () => add(p.id, -1);
+  document.querySelector(
+    '#minus'
+  ).onclick = () =>
+    add(p.id, -1);
 
-  document.querySelector('#plus').onclick =
-    () => add(p.id, 1);
+  document.querySelector(
+    '#plus'
+  ).onclick = () =>
+    add(p.id, 1);
 
-  document.querySelector('#addToCart').onclick =
-    () => add(p.id, 1);
+  document.querySelector(
+    '#addToCart'
+  ).onclick = () =>
+    add(p.id, 1);
 
-  document.querySelector('#share').onclick =
+  document.querySelector(
+    '#share'
+  ).onclick =
     shareProduct;
 
   updateCartBadge();
 }
 
-/* =========================================
+/* =========================
    SHARE
-========================================= */
+========================= */
 
 async function shareProduct() {
 
-  const url =
-    location.href;
-
   const p =
     getProduct();
+
+  const url =
+    location.href;
 
   try {
 
@@ -1270,9 +1679,8 @@ async function shareProduct() {
 
     } else {
 
-      await navigator.clipboard.writeText(
-        url
-      );
+      await navigator.clipboard
+        .writeText(url);
 
       alert(
         'Ссылка на товар скопирована.'
@@ -1280,30 +1688,31 @@ async function shareProduct() {
     }
 
   } catch {
-    /* Пользователь отменил */
+    /* cancelled */
   }
 }
 
-/* =========================================
-   CART DRAWER
-========================================= */
+/* =========================
+   CART
+========================= */
 
 function renderCart() {
 
   const items =
     Object.entries(cart)
-      .map(([id, q]) => ({
+      .map(([id, quantity]) => ({
         p: state.products.find(
-          (x) =>
-            String(x.id) ===
+          (product) =>
+            String(product.id) ===
             String(id)
         ),
-        q: Number(q)
+        q:
+          Number(quantity)
       }))
       .filter(
-        (x) =>
-          x.p &&
-          x.q > 0
+        (item) =>
+          item.p &&
+          item.q > 0
       );
 
   const old =
@@ -1315,13 +1724,15 @@ function renderCart() {
     old.remove();
   }
 
-  const el =
-    document.createElement('aside');
+  const drawer =
+    document.createElement(
+      'aside'
+    );
 
-  el.className =
+  drawer.className =
     'cart-drawer';
 
-  el.innerHTML = `
+  drawer.innerHTML = `
 
     <div class="cart-head">
 
@@ -1344,7 +1755,9 @@ function renderCart() {
 
       </div>
 
-      <div class="cart-head-actions">
+      <div
+        class="cart-head-actions"
+      >
 
         ${
           items.length
@@ -1376,24 +1789,33 @@ function renderCart() {
       items.length
         ? items
             .map(
-              ({ p, q }) => `
+              ({p, q}) => `
+
                 <div class="cart-row">
 
-                  <div class="cart-item-info">
+                  <div>
 
                     <b>
-                      ${esc(p.brand)}
+                      ${esc(
+                        p.brand
+                      )}
                     </b>
 
-                    <div class="cart-item-name">
-                      ${esc(p.name)}
+                    <div>
+                      ${esc(
+                        p.name
+                      )}
                     </div>
 
                     ${
                       p.sku
                         ? `
-                          <div class="muted">
-                            ${esc(p.sku)}
+                          <div
+                            class="muted"
+                          >
+                            ${esc(
+                              p.sku
+                            )}
                           </div>
                         `
                         : ''
@@ -1401,35 +1823,33 @@ function renderCart() {
 
                   </div>
 
-                  <div class="cart-item-actions">
+                  <div
+                    class="cart-item-actions"
+                  >
 
-                    <div class="qty">
+                    <button
+                      class="btn btn-ghost"
+                      data-cart-minus="${encodeURIComponent(
+                        p.id
+                      )}"
+                      type="button"
+                    >
+                      −
+                    </button>
 
-                      <button
-                        class="btn btn-ghost"
-                        data-cart-minus="${encodeURIComponent(
-                          p.id
-                        )}"
-                        type="button"
-                      >
-                        −
-                      </button>
+                    <b>
+                      ${q}
+                    </b>
 
-                      <b>
-                        ${q}
-                      </b>
-
-                      <button
-                        class="btn btn-ghost"
-                        data-cart-plus="${encodeURIComponent(
-                          p.id
-                        )}"
-                        type="button"
-                      >
-                        +
-                      </button>
-
-                    </div>
+                    <button
+                      class="btn btn-ghost"
+                      data-cart-plus="${encodeURIComponent(
+                        p.id
+                      )}"
+                      type="button"
+                    >
+                      +
+                    </button>
 
                   </div>
 
@@ -1464,31 +1884,31 @@ function renderCart() {
 
   `;
 
-  document.body.append(el);
+  document.body.append(
+    drawer
+  );
 
-  document.querySelector(
+  drawer.querySelector(
     '#closeCart'
-  ).onclick = () => {
-    el.remove();
-  };
+  ).onclick = () =>
+    drawer.remove();
 
   const clearButton =
-    document.querySelector(
+    drawer.querySelector(
       '#clearCart'
     );
 
   if (clearButton) {
 
-    clearButton.onclick =
-      () => {
+    clearButton.onclick = () => {
 
-        clearCart();
+      clearCart();
 
-        updateCartBadge();
-      };
+      updateCartBadge();
+    };
   }
 
-  document
+  drawer
     .querySelectorAll(
       '[data-cart-minus]'
     )
@@ -1507,7 +1927,7 @@ function renderCart() {
       };
     });
 
-  document
+  drawer
     .querySelectorAll(
       '[data-cart-plus]'
     )
@@ -1527,36 +1947,34 @@ function renderCart() {
     });
 
   const sendButton =
-    document.querySelector(
+    drawer.querySelector(
       '#sendRequest'
     );
 
   if (sendButton) {
+
     sendButton.onclick =
       sendRequest;
   }
 }
 
-/* =========================================
-   SEND REQUEST
-========================================= */
-
 function sendRequest() {
 
   const items =
     Object.entries(cart)
-      .map(([id, q]) => ({
+      .map(([id, quantity]) => ({
         p: state.products.find(
-          (x) =>
-            String(x.id) ===
+          (product) =>
+            String(product.id) ===
             String(id)
         ),
-        q: Number(q)
+        q:
+          Number(quantity)
       }))
       .filter(
-        (x) =>
-          x.p &&
-          x.q > 0
+        (item) =>
+          item.p &&
+          item.q > 0
       );
 
   if (!items.length) {
@@ -1566,7 +1984,7 @@ function sendRequest() {
   const lines =
     items
       .map(
-        ({ p, q }) =>
+        ({p, q}) =>
           `${
             p.sku ||
             p.name ||
@@ -1579,7 +1997,7 @@ function sendRequest() {
     `Заявка из YECHIM Catalog\n\n${lines}`;
 
   const username =
-    (
+    String(
       CONFIG.telegramManagerUsername ||
       ''
     )
@@ -1588,7 +2006,9 @@ function sendRequest() {
 
   if (
     !username ||
-    username.includes('YOUR_')
+    username.includes(
+      'YOUR_'
+    )
   ) {
 
     navigator.clipboard?.writeText(
@@ -1600,8 +2020,6 @@ function sendRequest() {
     alert(
       'Список заявки скопирован. Укажите Telegram username менеджера в supabase-config.js.'
     );
-
-    renderCart();
 
     return;
   }
@@ -1615,21 +2033,13 @@ function sendRequest() {
     '_blank'
   );
 
-  /* После отправки заявки корзина очищается */
   clearCart();
-
-  renderCart();
 }
 
-/* =========================================
-   EVENTS
-========================================= */
+/* =========================
+   BUTTON: ADD TO CART
+========================= */
 
-document.querySelector(
-  '#cartButton'
-).onclick = renderCart;
-
-/* Клики по кнопке "В корзину" на карточках */
 document.addEventListener(
   'click',
   (event) => {
@@ -1646,75 +2056,29 @@ document.addEventListener(
     event.preventDefault();
     event.stopPropagation();
 
-    const id =
+    add(
       decodeURIComponent(
         button.dataset.add
-      );
-
-    add(id, 1);
+      ),
+      1
+    );
   }
 );
 
-/* Навигация */
-window.add = add;
-window.renderCart = renderCart;
-window.goHome = goHome;
-window.goBrand = goBrand;
-window.goCategory = goCategory;
-
-/* =========================================
+/* =========================
    INIT
-========================================= */
+========================= */
+
+document.querySelector(
+  '#cartButton'
+).onclick =
+  renderCart;
 
 (async () => {
 
   await loadProducts();
 
-  const params =
-    new URLSearchParams(
-      location.search
-    );
-
-  const product =
-    params.get('product');
-
-  const brand =
-    params.get('brand');
-
-  const category =
-    params.get('category');
-
-  if (product) {
-
-    state.productId =
-      product;
-
-    renderDetail();
-
-  } else if (
-    brand &&
-    category
-  ) {
-
-    state.selectedBrand =
-      brand;
-
-    state.selectedCategory =
-      category;
-
-    renderCategoryProducts();
-
-  } else if (brand) {
-
-    state.selectedBrand =
-      brand;
-
-    renderBrandCategories();
-
-  } else {
-
-    renderHome();
-  }
+  renderRoute();
 
   updateCartBadge();
 
