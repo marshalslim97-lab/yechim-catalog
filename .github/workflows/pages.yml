@@ -34,6 +34,21 @@ jobs:
          cp -r data/* _site/data/ 2>/dev/null || true
          cp -r assets/* _site/assets/ 2>/dev/null || true
 
+      - name: Verify Pages artifact
+        run: |
+          echo "=== _site root ==="
+          ls -la _site
+          echo "=== index.html ==="
+          test -f _site/index.html
+          echo "index.html OK"
+          echo "=== dashboard ==="
+          ls -la _site/dashboard
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4
         with:
