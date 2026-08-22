@@ -67,16 +67,37 @@ async function init() {
 }
 
 function showLogin() {
-  $('#authPanel').hidden = false;
-  $('#appPanel').hidden = true;
-  $('#logoutBtn').hidden = true;
+  const authPanel = $('#authPanel');
+  const appPanel = $('#appPanel');
+  const logoutBtn = $('#logoutBtn');
+
+  authPanel.hidden = false;
+  authPanel.style.display = '';
+
+  appPanel.hidden = true;
+  appPanel.style.display = 'none';
+
+  logoutBtn.hidden = true;
+  logoutBtn.style.display = 'none';
 }
 
 async function showApp(session) {
-  $('#authPanel').hidden = true;
-  $('#appPanel').hidden = false;
-  $('#logoutBtn').hidden = false;
-  $('#userLabel').textContent = session.user.email || '';
+  const authPanel = $('#authPanel');
+  const appPanel = $('#appPanel');
+  const logoutBtn = $('#logoutBtn');
+
+  authPanel.hidden = true;
+  authPanel.style.display = 'none';
+
+  appPanel.hidden = false;
+  appPanel.style.display = '';
+
+  logoutBtn.hidden = false;
+  logoutBtn.style.display = '';
+
+  $('#userLabel').textContent =
+    session?.user?.email || '';
+
   await loadData();
 }
 
