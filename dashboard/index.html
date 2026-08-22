@@ -1,8 +1,368 @@
-<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>YECHIM Dashboard</title><link rel="stylesheet" href="../styles.css"></head><body>
-<header class="topbar"><div class="nav"><a class="logo" href="../">YECHIM<span>.</span></a><div class="grow"></div><span id="userLabel" class="muted"></span><button class="btn btn-ghost" id="logoutBtn" hidden>Выйти</button></div></header>
-<main class="dash"><section id="authPanel" class="auth-panel"><div class="panel narrow"><h1>YECHIM Dashboard</h1><p class="muted">Вход только для команды YECHIM.</p><div class="field"><label>E-mail</label><input id="email" type="email" autocomplete="username"></div><div class="field"><label>Пароль</label><input id="password" type="password" autocomplete="current-password"></div><button class="btn btn-primary full" id="loginBtn">Войти</button><div id="authError" class="error-text"></div></div></section>
-<section id="appPanel" hidden><div class="section-head"><div><h2>YECHIM Dashboard</h2><div class="muted">Данные Eman только для чтения. Доп. контент редактируется здесь.</div></div><div class="dash-actions"><span id="syncInfo" class="muted"></span><button class="btn btn-ghost" id="refreshBtn">Обновить</button></div></div>
-<div class="panel"><div class="toolbar"><input id="dq" placeholder="Поиск по артикулу или названию"><select id="statusFilter"><option value="all">Все товары</option><option value="published">Опубликованные</option><option value="draft">Не опубликованные</option></select><select id="brandFilter"><option value="all">Все бренды</option></select></div></div>
-<div class="panel table-wrap"><table class="table"><thead><tr><th>Товар</th><th>Артикул</th><th>Цена Eman</th><th>Заполнение</th><th>Статус</th><th></th></tr></thead><tbody id="tbody"></tbody></table></div></section></main>
-<div class="modal" id="modal"><div class="modal-card"><div class="modal-head"><div><div class="muted" id="mbrand"></div><h2 id="mtitle"></h2><div class="muted" id="msku"></div></div><button class="btn btn-ghost" id="closeModal">Закрыть</button></div><div id="fields"></div><div class="modal-actions"><button class="btn btn-primary" id="saveBtn">Сохранить</button></div><div id="saveError" class="error-text"></div></div></div>
-<script src="../supabase-config.js"></script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="app.js"></script></body></html>
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1"
+  >
+
+  <meta
+    name="theme-color"
+    content="#138353"
+  >
+
+  <title>YECHIM Dashboard</title>
+
+  <link rel="stylesheet" href="../styles.css">
+</head>
+
+<body>
+
+<header class="topbar">
+
+  <div class="nav">
+
+    <!--
+      Dashboard logo:
+      ./ = остаёмся внутри /dashboard/
+      ../assets/... = берём логотип из общей папки assets
+    -->
+    <a
+      class="logo dashboard-logo"
+      href="./"
+      aria-label="YECHIM Dashboard"
+    >
+      <img
+        src="../assets/brands/YECHIM.png"
+        alt="YECHIM"
+      >
+    </a>
+
+    <div class="grow"></div>
+
+    <span
+      id="userLabel"
+      class="muted"
+    ></span>
+
+    <button
+      id="logoutBtn"
+      class="btn btn-ghost"
+      type="button"
+      hidden
+    >
+      Выйти
+    </button>
+
+  </div>
+
+</header>
+
+
+<main class="dash">
+
+  <!-- =========================
+       LOGIN
+  ========================== -->
+
+  <section
+    id="authPanel"
+    class="auth-panel"
+  >
+
+    <div class="panel narrow">
+
+      <h1>
+        YECHIM Dashboard
+      </h1>
+
+      <p class="muted">
+        Вход только для команды YECHIM.
+      </p>
+
+      <div class="field">
+
+        <label for="email">
+          E-mail
+        </label>
+
+        <input
+          id="email"
+          type="email"
+          autocomplete="email"
+          placeholder="Введите e-mail"
+        >
+
+      </div>
+
+
+      <div class="field">
+
+        <label for="password">
+          Пароль
+        </label>
+
+        <input
+          id="password"
+          type="password"
+          autocomplete="current-password"
+          placeholder="Введите пароль"
+        >
+
+      </div>
+
+
+      <button
+        id="loginBtn"
+        class="btn btn-primary full"
+        type="button"
+      >
+        Войти
+      </button>
+
+
+      <div
+        id="authError"
+        class="error-text"
+      ></div>
+
+    </div>
+
+  </section>
+
+
+  <!-- =========================
+       DASHBOARD APP
+  ========================== -->
+
+  <section
+    id="appPanel"
+    hidden
+  >
+
+    <div class="section-head">
+
+      <div>
+
+        <h2>
+          YECHIM Dashboard
+        </h2>
+
+        <div class="muted">
+          Данные Eman только для чтения.
+          Доп. контент редактируется здесь.
+        </div>
+
+      </div>
+
+      <div class="dash-actions">
+
+        <span
+          id="syncInfo"
+          class="muted"
+        >
+          Загрузка…
+        </span>
+
+        <button
+          id="refreshBtn"
+          class="btn btn-ghost"
+          type="button"
+        >
+          Обновить
+        </button>
+
+      </div>
+
+    </div>
+
+
+    <!-- =========================
+         FILTERS / SEARCH
+    ========================== -->
+
+    <div class="panel">
+
+      <div class="toolbar">
+
+        <input
+          id="dq"
+          type="search"
+          placeholder="Поиск по артикулу или названию"
+        >
+
+        <select id="statusFilter">
+
+          <option value="all">
+            Все товары
+          </option>
+
+          <option value="published">
+            Опубликованные
+          </option>
+
+          <option value="draft">
+            Не опубликованные
+          </option>
+
+        </select>
+
+
+        <select id="brandFilter">
+
+          <option value="all">
+            Все бренды
+          </option>
+
+        </select>
+
+      </div>
+
+    </div>
+
+
+    <!-- =========================
+         PRODUCTS TABLE
+    ========================== -->
+
+    <div class="panel table-wrap">
+
+      <table class="table">
+
+        <thead>
+
+          <tr>
+
+            <th>
+              Товар
+            </th>
+
+            <th>
+              Артикул
+            </th>
+
+            <th>
+              Цена Eman
+            </th>
+
+            <th>
+              Заполнение
+            </th>
+
+            <th>
+              Статус
+            </th>
+
+            <th></th>
+
+          </tr>
+
+        </thead>
+
+
+        <tbody id="tbody">
+
+          <tr>
+
+            <td
+              colspan="6"
+              class="muted"
+            >
+              Загрузка…
+            </td>
+
+          </tr>
+
+        </tbody>
+
+      </table>
+
+    </div>
+
+  </section>
+
+</main>
+
+
+<!-- =========================
+     EDIT MODAL
+========================= -->
+
+<div
+  class="modal"
+  id="modal"
+>
+
+  <div class="modal-card">
+
+    <div class="modal-head">
+
+      <div>
+
+        <div
+          id="mbrand"
+          class="muted"
+        ></div>
+
+        <h2 id="mtitle">
+        </h2>
+
+        <div
+          id="msku"
+          class="muted small"
+        ></div>
+
+      </div>
+
+
+      <button
+        id="closeModal"
+        class="btn btn-ghost"
+        type="button"
+      >
+        ×
+      </button>
+
+    </div>
+
+
+    <!-- Dynamic edit fields -->
+    <div id="fields"></div>
+
+
+    <div
+      id="saveError"
+      class="error-text"
+    ></div>
+
+
+    <div class="modal-actions">
+
+      <button
+        id="saveBtn"
+        class="btn btn-primary"
+        type="button"
+      >
+        Сохранить
+      </button>
+
+    </div>
+
+  </div>
+
+</div>
+
+
+<!-- =========================
+     SCRIPTS
+========================= -->
+
+<script src="../supabase-config.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script src="app.js"></script>
+
+</body>
+</html>
